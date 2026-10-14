@@ -1,0 +1,208 @@
+{
+  "name": "LinkedIn Notion Autopilot - Gemini",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "event": "pagedUpdatedInDatabase",
+        "databaseId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        }
+      },
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1,
+      "position": [-544, 464],
+      "name": "Surveillance Notion",
+      "alwaysOutputData": true,
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.Statut }}",
+              "value2": "⏳ À Générer"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-192, 368],
+      "name": "Si À Générer"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Tu es le ghostwriter LinkedIn de [TON NOM].\\n\\nPROFIL :\\n- [Ta formation / ton poste actuel]\\n- [Ton objectif professionnel]\\n- Passionné par : [tes centres d'intérêt]\\n- Technologies utilisées : [tes outils]\\n- Ton style : direct, concret, humble mais confiant — tu partages ce que tu apprends, pas ce que tu maîtrises parfaitement\\n\\nSUJET DU POST : {{ $json.Titre }}\\nNOTES : {{ $json.Contenu }}\\nTECHNOLOGIES : {{ $json.Technologies }}\\n\\nRÈGLES STRICTES :\\n1. RESTE STRICTEMENT sur le sujet fourni — ne parle pas de toi en dehors du contexte du sujet\\n2. Commence TOUJOURS par un hook percutant sur la première ligne (question choc, stat surprenante, ou affirmation provocante) — cette ligne doit forcer à cliquer 'voir plus'\\n3. Utilise le ton d'un étudiant/junior qui partage une vraie expérience terrain, pas d'un expert qui donne des leçons\\n4. Structure : Hook → Contexte court → Ce que j'ai fait/appris → Leçon concrète → Call to action\\n5. 150-180 mots maximum\\n6. 2 emojis maximum, placés naturellement\\n7. 5-7 hashtags pertinents à la fin uniquement\\n8. Pas de phrases génériques comme 'Dans le monde du numérique' ou 'La transformation digitale'\\n9. Termine par une question qui invite les gens à commenter\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [32, 336],
+      "name": "Gemini Rédige"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Surveillance Notion').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Post_Genere|rich_text",
+              "textContent": "={{ $json.candidates[0].content.parts[0].text }}"
+            },
+            {
+              "key": "Statut|select",
+              "selectValue": "✏️ Prêt à Publier"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [208, 368],
+      "name": "Update Prêt"
+    },
+    {
+      "parameters": {
+        "sendTo": "votre.email@exemple.com",
+        "subject": "={{ '🤖 Post prêt : ' + $('Surveillance Notion').item.json.Titre }}",
+        "message": "Salut, le post est prêt. Ajoute la photo et passe en 'Publier'.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [448, 368],
+      "name": "Mail Notif",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.Statut }}",
+              "value2": "🚀 Publier"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [-256, 640],
+      "name": "Si Publier"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.Ma_Photo[0] }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [16, 624],
+      "name": "Télécharge Image"
+    },
+    {
+      "parameters": {
+        "person": "=",
+        "text": "={{ $json.Post_Genere }}",
+        "shareMediaCategory": "IMAGE",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [208, 624],
+      "name": "LinkedIn Final"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Surveillance Notion').item.json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Statut|select",
+              "selectValue": "✅ Terminé"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [464, 608],
+      "name": "Marqué Terminé"
+    }
+  ],
+  "connections": {
+    "Surveillance Notion": {
+      "main": [
+        [
+          { "node": "Si À Générer", "type": "main", "index": 0 },
+          { "node": "Si Publier", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Si À Générer": {
+      "main": [[{ "node": "Gemini Rédige", "type": "main", "index": 0 }]]
+    },
+    "Gemini Rédige": {
+      "main": [[{ "node": "Update Prêt", "type": "main", "index": 0 }]]
+    },
+    "Update Prêt": {
+      "main": [[{ "node": "Mail Notif", "type": "main", "index": 0 }]]
+    },
+    "Si Publier": {
+      "main": [[{ "node": "Télécharge Image", "type": "main", "index": 0 }]]
+    },
+    "Télécharge Image": {
+      "main": [[{ "node": "LinkedIn Final", "type": "main", "index": 0 }]]
+    },
+    "LinkedIn Final": {
+      "main": [[{ "node": "Marqué Terminé", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "meta": {}
+}
