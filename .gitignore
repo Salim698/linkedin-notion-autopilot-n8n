@@ -1,0 +1,14 @@
+# Secrets
+.env
+*.env
+!.env.example
+
+# n8n
+.n8n/
+credentials*.json
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
